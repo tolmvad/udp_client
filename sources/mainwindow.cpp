@@ -2,6 +2,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent) {
 	initGui();
+	udpSocket = new QUdpSocket(this);
 }
 
 MainWindow::~MainWindow() {
@@ -13,16 +14,50 @@ MainWindow::~MainWindow() {
 	delete lnSend;
 	delete lbClient;
 	delete lbSendto;
+	delete udpSocket;
 }
 
 void MainWindow::clickSend() {
-	textBrw->append("Some text here");
-	statusBar()->showMessage("\"Send\" clicked", 2000);
-	textEdt->clear();
+	if (lnClient->isReadOnly()) {
+		portSend = lnSend->text().toUShort();
+		if (portSend > 1023 && portSend < 65535) {
+			udpSocket->writeDatagram(textEdt->toPlainText().toUtf8(), QHostAddress::LocalHost, portSend);
+			textBrw->append(QString("to %1: ").arg(portSend) + textEdt->toPlainText());
+			textEdt->clear();
+			statusBar()->showMessage("Message send", 5000);
+		} else {
+			statusBar()->showMessage("Error: expected port from range 1024-65534", 10000);
+		}
+	} else {
+		statusBar()->showMessage("Error: client not connected", 10000);
+	}
 }
 
 void MainWindow::clickConnecting() {
-	statusBar()->showMessage("\"Connecting\" clicked", 2000);
+	portListn = lnClient->text().toUShort();
+	if (portListn > 1023 && portListn < 65535) {
+		lnClient->setReadOnly(true);
+		btnConnect->setText("Successful");
+		btnConnect->setDisabled(true);
+		statusBar()->showMessage("Client running on port: " + lnClient->text(), 5000);
+		udpSocket->bind(QHostAddress::LocalHost, portListn);
+		connect(udpSocket, &QUdpSocket::readyRead, this, &MainWindow::readDatagrams);
+	} else {
+		statusBar()->showMessage("Error: expected port from range 1024-65534", 10000);
+	}
+}
+
+void MainWindow::readDatagrams() {
+	QHostAddress	sender;
+	quint16			senderPort;
+
+	while (udpSocket->hasPendingDatagrams()) {
+		QByteArray	datagram;
+
+		datagram.resize(udpSocket->pendingDatagramSize());
+		udpSocket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
+		textBrw->append(QString("from %1: ").arg(senderPort) + QString(datagram));
+	}
 }
 
 void MainWindow::initGui() {
@@ -37,6 +72,8 @@ void MainWindow::initGui() {
 
 	// LineEdit to client port
 	lnClient = new QLineEdit(this);
+	lnClient->setAlignment(Qt::AlignCenter);
+	lnClient->setPlaceholderText("Client port");
 	lnClient->setGeometry(710, 30, 80, 20);
 
 	// Button "Connecting"
@@ -49,8 +86,10 @@ void MainWindow::initGui() {
 	lbSendto->setAlignment(Qt::AlignCenter);
 	lbSendto->setGeometry(700, 100, 100, 20);
 
-	// LineEdit to send message
+	// LineEdit to receiver port
 	lnSend = new QLineEdit(this);
+	lnSend->setAlignment(Qt::AlignCenter);
+	lnSend->setPlaceholderText("Receiver port");
 	lnSend->setGeometry(710, 130, 80, 20);
 
 	// Button "Send"

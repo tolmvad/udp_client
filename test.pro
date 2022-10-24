@@ -6,7 +6,7 @@ TEMPLATE = app
 TARGET = client
 INCLUDEPATH += .
 
-QT += widgets
+QT += widgets network
 
 # Input
 HEADERS += includes/mainwindow.hpp
