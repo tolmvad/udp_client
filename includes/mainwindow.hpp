@@ -3,6 +3,7 @@
 
 #include <QtWidgets>
 #include <QtNetwork>
+#include <limits>
 
 class QPushButton;
 class QTextBrowser;

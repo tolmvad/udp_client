@@ -20,13 +20,18 @@ MainWindow::~MainWindow() {
 void MainWindow::clickSend() {
 	if (lnClient->isReadOnly()) {
 		portSend = lnSend->text().toUShort();
-		if (portSend > 1023 && portSend < 65535) {
-			udpSocket->writeDatagram(textEdt->toPlainText().toUtf8(), QHostAddress::LocalHost, portSend);
-			textBrw->append(QString("to %1: ").arg(portSend) + textEdt->toPlainText());
-			textEdt->clear();
-			statusBar()->showMessage("Message send", 5000);
+		if (portSend > 1023 && portSend <= std::numeric_limits<quint16>::max()) {
+			if (textEdt->toPlainText().toUtf8().size() != 0) {
+				// qDebug() << "TextEdit msg size:" << textEdt->toPlainText().toUtf8().size();
+				udpSocket->writeDatagram(textEdt->toPlainText().toUtf8(), QHostAddress::LocalHost, portSend);
+				textBrw->append(QString("to %1: ").arg(portSend) + textEdt->toPlainText());
+				textEdt->clear();
+				statusBar()->showMessage("Message send", 5000);
+			} else {
+				statusBar()->showMessage("Message field is empty", 5000);
+			}
 		} else {
-			statusBar()->showMessage("Error: expected port from range 1024-65534", 10000);
+			statusBar()->showMessage("Error: expected port from range 1024-65535", 10000);
 		}
 	} else {
 		statusBar()->showMessage("Error: client not connected", 10000);
@@ -35,7 +40,7 @@ void MainWindow::clickSend() {
 
 void MainWindow::clickConnecting() {
 	portListn = lnClient->text().toUShort();
-	if (portListn > 1023 && portListn < 65535) {
+	if (portListn > 1023 && portListn <= std::numeric_limits<quint16>::max()) {
 		lnClient->setReadOnly(true);
 		btnConnect->setText("Successful");
 		btnConnect->setDisabled(true);
@@ -43,7 +48,7 @@ void MainWindow::clickConnecting() {
 		udpSocket->bind(QHostAddress::LocalHost, portListn);
 		connect(udpSocket, &QUdpSocket::readyRead, this, &MainWindow::readDatagrams);
 	} else {
-		statusBar()->showMessage("Error: expected port from range 1024-65534", 10000);
+		statusBar()->showMessage("Error: expected port from range 1024-65535", 10000);
 	}
 }
 
@@ -57,6 +62,7 @@ void MainWindow::readDatagrams() {
 		datagram.resize(udpSocket->pendingDatagramSize());
 		udpSocket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
 		textBrw->append(QString("from %1: ").arg(senderPort) + QString(datagram));
+		// qDebug() << "msg size: "<< datagram.size();
 	}
 }
 
