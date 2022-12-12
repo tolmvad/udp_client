@@ -9,5 +9,5 @@ INCLUDEPATH += .
 QT += widgets network core
 
 # Input
-HEADERS += includes/mainwindow.hpp
-SOURCES += sources/main.cpp sources/mainwindow.cpp
+HEADERS += includes/mainwindow.hpp includes/package.hpp
+SOURCES += sources/main.cpp sources/mainwindow.cpp sources/package.cpp

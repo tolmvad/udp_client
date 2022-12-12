@@ -5,6 +5,9 @@
 #include <QtNetwork>
 #include <QtCore>
 #include <limits>
+#include <unistd.h>
+#include <vector>
+#include "package.hpp"
 
 #define DEFAULT_PACKAGE_SIZE	100
 #define DEFAULT_FREQUENCY		0
@@ -16,6 +19,8 @@ class QLineEditor;
 class QLabel;
 class QUdpSocket;
 class QHostAddress;
+class QDateTime;
+class Package;
 
 class MainWindow : public QMainWindow {
 	public:
@@ -49,8 +54,9 @@ class MainWindow : public QMainWindow {
 		int				emptyMsg();
 		void			packManager(const QString &msg);
 		int				packageSize;
-		int				checkPackageSize(const QString &size);
+		int				checkPackageSize(const QString &value);
 		int				frequency;
+		int				checkFrequency(const QString &value);
 };
 
 #endif

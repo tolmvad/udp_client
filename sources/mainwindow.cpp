@@ -110,16 +110,45 @@ int MainWindow::bindPort() {
 	return 0;
 }
 
+Message newMessage(Package &p, quint16 &sender) {
+	Message tmp;
+
+	tmp.packs = p.getTotal();
+	tmp.sender = sender;
+	tmp.timestamp = p.getTimestamp();
+	tmp.text = p.getText();
+	return tmp;
+}
+
 void MainWindow::readDatagrams() {
-	QHostAddress	sender;
-	quint16			senderPort;
+	std::vector<Message>	messages;
+	QHostAddress			sender;
+	quint16					senderPort;
 
 	while (udpSocket->hasPendingDatagrams()) {
 		QByteArray	datagram;
+		Package		package;
 
 		datagram.resize(udpSocket->pendingDatagramSize());
 		udpSocket->readDatagram(datagram.data(), datagram.size(), &sender, &senderPort);
-		textBrw->append(QString("from %1: ").arg(senderPort) + QString(datagram));
+		package.unzip(datagram);
+
+		if (package.getTotal() == 1)
+			textBrw->append(QString("from %1: ").arg(senderPort) + QString(package.getText()));
+		else if (package.getCurrent() == 0) {
+			messages.push_back(newMessage(package, senderPort));
+		} else {
+			for (size_t i = 0; i < messages.size(); i++) {
+				if (messages[i].sender == senderPort) {
+					messages[i].text.append(package.getText());
+					if (messages[i].packs == package.getCurrent() + 1) {
+						textBrw->append(QString("from %1: ").arg(senderPort) + QString(messages[i].text));
+						messages.erase(messages.begin() + i);
+						break;
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -146,10 +175,11 @@ int MainWindow::checkSendPort() {
 
 void MainWindow::sendMsg() {
 	if (emptyMsg()) {
-		checkPackageSize(lnPackagesize->text());
-		packManager(msgField->toPlainText());
-		msgField->clear();
-		statusBar()->showMessage("Message send", 5000);
+		if (checkPackageSize(lnPackagesize->text()) && checkFrequency(lnFrequency->text())) {
+			packManager(msgField->toPlainText());
+			msgField->clear();
+			statusBar()->showMessage("Message send", 5000);
+		}
 	}
 }
 
@@ -161,13 +191,13 @@ int MainWindow::emptyMsg() {
 	return 1;
 }
 
-int MainWindow::checkPackageSize(const QString &size) {
-	if (size.isEmpty()) {
+int MainWindow::checkPackageSize(const QString &value) {
+	if (value.isEmpty()) {
 		packageSize = DEFAULT_PACKAGE_SIZE;
 		return 1;
 	}
 
-	int tmpSize = size.toInt();
+	int tmpSize = value.toInt();
 	if (tmpSize > 0) {
 		packageSize = tmpSize;
 		return 1;
@@ -177,17 +207,35 @@ int MainWindow::checkPackageSize(const QString &size) {
 	return 0;
 }
 
+int MainWindow::checkFrequency(const QString &value) {
+	if (value.isEmpty()) {
+		frequency = DEFAULT_FREQUENCY;
+		return 1;
+	}
+
+	int tmpFreq = value.toInt();
+	if (tmpFreq > 0) {
+		frequency = tmpFreq;
+		return 1;
+	}
+
+	statusBar()->showMessage("Error: expected frequency value > 0 or empty field");
+	return 0;
+
+}
+
 void MainWindow::packManager(const QString &msg) {
+	QString time = QDateTime().currentDateTimeUtc().toString();
 	QByteArray byteMsg = msg.toUtf8();
 	int msgSize = msg.toUtf8().size();
 	int packageNeed = (msgSize % packageSize != 0) ? (msgSize / packageSize + 1) : (msgSize / packageSize);
-	textBrw->append(QString("to %1: ").arg(portSend) + msg);
-	/*
-	*** Debug mode
-	*/
-	qDebug() << "MSG:" << msgSize << "| PKSZ:" << packageSize << "| TOTAL:" << packageNeed;
+
 	for (int i = 0; i < packageNeed; i++) {
-		udpSocket->writeDatagram(byteMsg.mid(i * packageSize, packageSize), QHostAddress::LocalHost, portSend);
+		Package fragment(packageNeed, i, time, byteMsg.mid(i * packageSize, packageSize));
+		udpSocket->writeDatagram(fragment.zip(), QHostAddress::LocalHost, portSend);
+		//usleep(frequency * 1000);
 	}
-	//udpSocket->writeDatagram(byteMsg, QHostAddress::LocalHost, portSend);
+	textBrw->append(QString("to %1: ").arg(portSend) + msg);
 }
+
+
